@@ -214,7 +214,7 @@
     <div class="topbar-inner">
       <div class="brand">
         <div class="brand-mark">AI</div>
-        <div>OCS LLM Answerer <small id="version">v0.3.0</small></div>
+        <div>OCS LLM Answerer <small id="version">v0.3.1</small></div>
       </div>
       <div id="status-pill" class="status-pill"><span class="dot"></span><span id="status-text">检查服务状态…</span></div>
     </div>
@@ -401,7 +401,7 @@
           <button type="button" class="ghost" id="download-ocs">下载 JSON</button>
         </div>
         <pre id="ocs-preview" class="code">加载中…</pre>
-        <p class="hint">配置会自动使用当前表单里的 host/port。若已设置 API Token，预览里会出现 <code>Bearer YOUR_API_TOKEN</code> 占位符，请替换成实际 Token。</p>
+        <p class="hint">配置会自动使用当前表单里的 host/port。OCS 要求最外层是数组，请复制从 <code>[</code> 到 <code>]</code> 的完整内容，不要只复制花括号对象。若已设置 API Token，预览里会出现 <code>Bearer YOUR_API_TOKEN</code> 占位符，请替换成实际 Token。</p>
       </section>
 
       <div class="savebar">
@@ -583,7 +583,7 @@ uv run ocs-llm-answerer</pre>
       } else {
         delete wrapper.headers.Authorization;
       }
-      state.ocsText = JSON.stringify(wrapper, null, 2);
+      state.ocsText = JSON.stringify([wrapper], null, 2);
       byId("ocs-preview").textContent = state.ocsText;
     }
 

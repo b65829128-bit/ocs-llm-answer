@@ -1,6 +1,6 @@
 # OCS LLM Answerer 开发文档
 
-> 版本：0.3.0 · 日期：2026-10-24 · 形态：本地自用 MVP + WebUI 配置器 · 项目管理：uv + pyproject + uv.lock
+> 版本：0.3.1 · 日期：2026-10-24 · 形态：本地自用 MVP + WebUI 配置器 · 项目管理：uv + pyproject + uv.lock
 >
 > 代码：`app/` · 启动：`uv run ocs-llm-answerer` · OCS 配置：`ocs-config.json`
 
@@ -500,7 +500,7 @@ OCS 会并行请求所有启用的 wrapper，没有优先级。题库 + LLM 同�
 uv run pytest
 ```
 
-当前 36 个用例，覆盖：
+当前 37 个用例，覆盖：
 
 - 选项标签清洗与 A/B/C 重排；
 - 单选字母/文本/“答案是B”；
@@ -512,7 +512,8 @@ uv run pytest
 - 缓存命中、图片缓存隔离、低置信度、鉴权、空题干、字符串 options、统计；
 - DeepSeek thinking/非思考/旧 reasoner payload；
 - vision 模型判断、图片消息结构、JSON 解析；
-- WebUI 配置页、配置脱敏、Token/本机保护、`.env` 保存与回读、连接测试、OCS 配置生成。
+- WebUI 配置页、配置脱敏、Token/本机保护、`.env` 保存与回读、连接测试、OCS 配置生成；
+- WebUI OCS 预览必须输出顶层数组（防 OCS `Spread syntax` 解析错误）。
 
 ### 13.2 建议补充
 
@@ -593,7 +594,7 @@ uv run ocs-llm-answerer --host 127.0.0.1 --port 8787
 - deepseek-flash 图片输入；
 - 缓存 key 加图片摘要和思考模式；
 - 内置 WebUI 配置器（/setup）：连接测试、保存 .env、生成 OCS 配置；
-- 36 个自动化测试。
+- 37 个自动化测试。
 
 ### v0.4（质量）
 

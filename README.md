@@ -166,6 +166,8 @@ deepseek-v4-pro 不支持图片；如果强制用它做图片题，服务会退�
 3. 回到课程页面，点“开始答题”。
 4. 结果面板出现答案和蓝色“AI”标签，说明接入成功。
 
+> ⚠️ OCS 的题库配置最外层必须是**数组**：从 `[` 到 `]` 的完整内容。只粘贴单个 `{ ... }` 会报 `Spread syntax requires ...iterable[Symbol.iterator] to be a function`。在 `/setup` 页面点“复制 JSON”可以拿到正确数组。
+
 默认配置用 GM_xmlhttpRequest：
 
 - 好处：绕过页面 CSP/CORS，适合 http://127.0.0.1。
@@ -325,7 +327,7 @@ ocs-llm-answerer/
 uv run pytest
 ```
 
-当前 36 个用例，覆盖：选项/答案归一化、题型推断、API 主流程、缓存、图片缓存隔离、低置信度、鉴权、字符串 options、统计、DeepSeek thinking/vision payload、JSON 解析，以及 WebUI 配置读取/脱敏、保存 .env、连接测试、OCS 配置生成和本机/Token 保护。
+当前 37 个用例，覆盖：选项/答案归一化、题型推断、API 主流程、缓存、图片缓存隔离、低置信度、鉴权、字符串 options、统计、DeepSeek thinking/vision payload、JSON 解析，以及 WebUI 配置读取/脱敏、保存 .env、连接测试、OCS 配置生成和本机/Token 保护。
 
 ## 9. 常见问题
 
@@ -343,6 +345,7 @@ uv run pytest
 | 改了 prompt 但答案没变 | 清空 OCS 题库缓存；服务端缓存可用 POST /api/cache/clear 清 |
 | 401 | OCS 配置的 headers 里加 Authorization: Bearer <token>；配置页需要输入 API Token |
 | 配置页 403 | 配置接口只允许本机；远程访问请先设置 API_TOKEN，并通过 token 访问 |
+| OCS 解析失败：Spread syntax requires ... | 题库配置最外层必须是数组 `[...]`，不能只粘贴单个对象；重新从 /setup 复制完整 JSON |
 | 保存配置后没变化 | 配置写入 .env 后需要重启服务 |
 | 400 / 模型不存在 | 使用 deepseek-flash 或 deepseek-v4-pro；旧模型名已过时 |
 | 402 | DeepSeek 余额不足，充值后重试 |

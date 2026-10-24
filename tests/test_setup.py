@@ -38,6 +38,12 @@ def test_setup_page_and_redirects(tmp_path):
     assert config.headers["location"] == "/setup"
 
 
+def test_setup_page_generates_wrapper_array():
+    page = (Path(__file__).resolve().parents[1] / "app" / "static" / "setup.html").read_text(encoding="utf-8")
+    # OCS 手动粘贴解析依赖顶层数组；WebUI 预览不能只输出单个对象。
+    assert "JSON.stringify([wrapper], null, 2)" in page
+
+
 def test_config_requires_token_and_redacts_secrets(tmp_path):
     client = make_client(tmp_path, deepseek_api_key="sk-do-not-leak")
     assert client.get("/api/config").status_code == 401

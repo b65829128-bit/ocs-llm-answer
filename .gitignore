@@ -26,3 +26,6 @@ data/*.log
 
 # OS
 .DS_Store
+
+# Temporary upstream source check
+.ocs-check/
