@@ -214,7 +214,7 @@
     <div class="topbar-inner">
       <div class="brand">
         <div class="brand-mark">AI</div>
-        <div>OCS LLM Answerer <small id="version">v0.3.1</small></div>
+        <div>OCS LLM Answerer <small id="version">v0.3.2</small></div>
       </div>
       <div id="status-pill" class="status-pill"><span class="dot"></span><span id="status-text">检查服务状态…</span></div>
     </div>
@@ -525,12 +525,26 @@ uv run ocs-llm-answerer</pre>
 
     function updateSecretHints() {
       var keyConfigured = state.config && state.config.api_key_configured;
+      var keyLoaded = state.config && state.config.api_key_loaded;
       var tokenConfigured = state.config && state.config.api_token_configured;
-      byId("api_key").placeholder = keyConfigured ? "已配置，留空不修改" : "sk-...";
-      byId("api-key-hint").textContent = keyConfigured
-        ? "已保存 Key。留空保持不变；勾选右侧可清除。"
-        : "还没有保存 Key，填入后保存。";
-      byId("api_token").placeholder = tokenConfigured ? "已配置，留空不修改" : "留空表示不设置";
+      var tokenLoaded = state.config && state.config.api_token_loaded;
+      if (keyConfigured && !keyLoaded) {
+        byId("api_key").placeholder = "已写入 .env，重启后生效";
+        byId("api-key-hint").textContent = "Key 已写入 .env，但当前进程还没加载，重启服务后才会用于答题。";
+      } else if (keyLoaded) {
+        byId("api_key").placeholder = "已加载，留空不修改";
+        byId("api-key-hint").textContent = "Key 已加载。留空保持不变；勾选右侧可清除。";
+      } else {
+        byId("api_key").placeholder = "sk-...";
+        byId("api-key-hint").textContent = "还没有保存 Key，填入后保存。";
+      }
+      if (tokenConfigured && !tokenLoaded) {
+        byId("api_token").placeholder = "已写入 .env，重启后生效";
+      } else if (tokenLoaded) {
+        byId("api_token").placeholder = "已加载，留空不修改";
+      } else {
+        byId("api_token").placeholder = "留空表示不设置";
+      }
     }
 
     function fillForm(config) {
@@ -588,6 +602,12 @@ uv run ocs-llm-answerer</pre>
     }
 
     async function loadHealth() {
+      if (state.config && (state.config.restart_pending ||
+          (state.config.api_key_configured && !state.config.api_key_loaded) ||
+          (state.config.api_token_configured && !state.config.api_token_loaded))) {
+        setStatus("配置已保存 · 重启后生效", false);
+        return;
+      }
       try {
         var response = await fetch("/health");
         var data = await response.json();
@@ -616,8 +636,15 @@ uv run ocs-llm-answerer</pre>
         var config = await api("/api/config");
         fillForm(config);
         byId("auth-card").hidden = true;
-        setAlert("");
+        var pending = (config.api_key_configured && !config.api_key_loaded) ||
+          (config.api_token_configured && !config.api_token_loaded);
+        if (pending) {
+          setAlert("检测到 .env 中已保存新的 Key/Token，但当前运行进程还没加载；重启服务后生效。", "warn");
+        } else {
+          setAlert("");
+        }
         await loadOcs();
+        await loadHealth();
       } catch (err) {
         if (err.status === 401) {
           byId("auth-card").hidden = false;
@@ -666,24 +693,32 @@ uv run ocs-llm-answerer</pre>
       event.preventDefault();
       var button = byId("save-btn");
       var form = payload();
+      if ((form.clear_api_key && form.api_key) || (form.clear_api_token && form.api_token)) {
+        setAlert("不能同时填写新密钥和勾选“清除”。请只保留一种操作。", "warn");
+        return;
+      }
       button.disabled = true;
       button.textContent = "保存中…";
       try {
         var result = await api("/api/config/save", { method: "POST", body: JSON.stringify(form) });
         state.config.api_key_configured = result.api_key_configured;
         state.config.api_token_configured = result.api_token_configured;
-        byId("api_key").value = "";
-        byId("api_token").value = "";
+        if (form.api_key || form.clear_api_key) { state.config.api_key_loaded = false; }
+        if (form.api_token || form.clear_api_token) { state.config.api_token_loaded = false; }
+        if (form.api_key || form.clear_api_key || form.api_token || form.clear_api_token) {
+          state.config.restart_pending = true;
+        }
         byId("clear_api_key").checked = false;
         byId("clear_api_token").checked = false;
         updateSecretHints();
         updateOcs();
-        setAlert("配置已保存到 " + result.env_file + "。请重启服务使其生效。", "success");
-        if (form.clear_api_token) {
-          setAlert("配置已保存，API Token 已清除。重启后配置页不再需要口令。", "warn");
-        } else if (form.api_token) {
-          setAlert("配置已保存。重启后配置页将要求输入新的 API Token。", "warn");
-        }
+        await loadHealth();
+        var note = "配置已保存到 " + result.env_file + "。请重启服务使其生效。";
+        if (form.api_key) { note += " 新 API Key 已写入 .env，重启后服务会使用它。"; }
+        if (form.clear_api_key) { note += " API Key 已清除。"; }
+        if (form.clear_api_token) { note += " API Token 已清除，重启后配置页不再需要口令。"; }
+        else if (form.api_token) { note += " 重启后配置页将要求输入新的 API Token。"; }
+        setAlert(note, form.clear_api_key || form.clear_api_token || form.api_token ? "warn" : "success");
       } catch (err) {
         setAlert("保存失败：" + err.message, "error");
       } finally {
@@ -733,6 +768,18 @@ uv run ocs-llm-answerer</pre>
     ["host", "port", "api_token", "clear_api_token"].forEach(function (id) {
       byId(id).addEventListener("input", updateOcs);
       byId(id).addEventListener("change", updateOcs);
+    });
+    byId("api_key").addEventListener("input", function () {
+      if (this.value) { byId("clear_api_key").checked = false; }
+    });
+    byId("clear_api_key").addEventListener("change", function () {
+      if (this.checked) { byId("api_key").value = ""; }
+    });
+    byId("api_token").addEventListener("input", function () {
+      if (this.value) { byId("clear_api_token").checked = false; }
+    });
+    byId("clear_api_token").addEventListener("change", function () {
+      if (this.checked) { byId("api_token").value = ""; }
     });
 
     loadHealth();

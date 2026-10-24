@@ -34,7 +34,18 @@ OCS_RESPONSE_HANDLER = (
 )
 
 
+def _saved_values(settings: Settings) -> dict:
+    env_path = Path(settings.env_path)
+    return dotenv_values(env_path) if env_path.exists() else {}
+
+
 def public_config(settings: Settings) -> dict:
+    env_exists = Path(settings.env_path).exists()
+    saved = _saved_values(settings)
+    runtime_key = bool(settings.deepseek_api_key)
+    runtime_token = bool(settings.api_token)
+    file_key = bool(saved.get("DEEPSEEK_API_KEY")) if env_exists else runtime_key
+    file_token = bool(saved.get("API_TOKEN")) if env_exists else runtime_token
     return {
         "version": __version__,
         "host": settings.host,
@@ -58,8 +69,12 @@ def public_config(settings: Settings) -> dict:
         "cache_ttl_seconds": settings.cache_ttl_seconds,
         "cors_origins": settings.cors_origins,
         "log_level": settings.log_level,
-        "api_key_configured": bool(settings.deepseek_api_key),
-        "api_token_configured": bool(settings.api_token),
+        # configured = .env 中已保存；loaded = 当前进程已加载。两者不同说明需要重启。
+        "api_key_configured": file_key,
+        "api_key_loaded": runtime_key,
+        "api_token_configured": file_token,
+        "api_token_loaded": runtime_token,
+        "restart_pending": file_key != runtime_key or file_token != runtime_token,
         "env_file": str(settings.env_path),
     }
 
@@ -133,7 +148,18 @@ async def test_deepseek_connection(payload: ConfigUpdate, settings: Settings) ->
             "latency_ms": 0,
         }
 
-    api_key = "" if payload.clear_api_key else (payload.api_key or settings.deepseek_api_key).strip()
+    saved = _saved_values(settings)
+    saved_key = str(saved.get("DEEPSEEK_API_KEY") or "").strip()
+    runtime_key = settings.deepseek_api_key.strip()
+    if payload.clear_api_key:
+        api_key, key_source = "", "none"
+    elif payload.api_key:
+        api_key, key_source = payload.api_key.strip(), "form"
+    elif saved_key and saved_key != runtime_key:
+        # 页面保存后、进程重启前：优先测试刚写入 .env 的 Key。
+        api_key, key_source = saved_key, "env_file"
+    else:
+        api_key, key_source = runtime_key, "runtime"
     if not api_key:
         return {"ok": False, "message": "尚未配置 DEEPSEEK_API_KEY。"}
 
@@ -176,12 +202,16 @@ async def test_deepseek_connection(payload: ConfigUpdate, settings: Settings) ->
     if not choices:
         return {"ok": False, "status": 200, "message": "响应中没有 choices。"}
     content = ((choices[0].get("message") or {}).get("content") or "").strip()
+    message = "连接成功。" + (f" 模型回复：{content[:80]}" if content else "")
+    if key_source == "env_file":
+        message += " 使用的是 .env 中刚保存的 Key，重启服务后答题才会使用它。"
     return {
         "ok": True,
         "status": 200,
         "model": data.get("model") or payload.model,
         "latency_ms": latency_ms,
-        "message": "连接成功。" + (f" 模型回复：{content[:80]}" if content else ""),
+        "message": message,
+        "key_source": key_source,
         "usage": data.get("usage") or {},
     }
 

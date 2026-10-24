@@ -78,7 +78,7 @@ http://127.0.0.1:8787/setup
 - 一键生成/复制/下载 OCS 题库配置；
 - 保存到 `.env`。
 
-保存后需要重启服务生效。配置页默认只允许本机访问；设置 API_TOKEN 后需要先输入口令。页面不会把已保存的 API Key 回传到浏览器。
+保存后需要重启服务生效。保存 API Key 后如果看到“已写入 .env，重启后生效”，说明文件已经写入，只是当前进程还没加载；重启服务即可。配置页默认只允许本机访问；设置 API_TOKEN 后需要先输入口令。页面不会把已保存的 API Key 回传到浏览器。
 
 ### 验证
 
@@ -327,7 +327,7 @@ ocs-llm-answerer/
 uv run pytest
 ```
 
-当前 37 个用例，覆盖：选项/答案归一化、题型推断、API 主流程、缓存、图片缓存隔离、低置信度、鉴权、字符串 options、统计、DeepSeek thinking/vision payload、JSON 解析，以及 WebUI 配置读取/脱敏、保存 .env、连接测试、OCS 配置生成和本机/Token 保护。
+当前 39 个用例，覆盖：选项/答案归一化、题型推断、API 主流程、缓存、图片缓存隔离、低置信度、鉴权、字符串 options、统计、DeepSeek thinking/vision payload、JSON 解析，以及 WebUI 配置读取/脱敏、保存 .env、连接测试、OCS 配置生成和本机/Token 保护。
 
 ## 9. 常见问题
 
@@ -347,6 +347,7 @@ uv run pytest
 | 配置页 403 | 配置接口只允许本机；远程访问请先设置 API_TOKEN，并通过 token 访问 |
 | OCS 解析失败：Spread syntax requires ... | 题库配置最外层必须是数组 `[...]`，不能只粘贴单个对象；重新从 /setup 复制完整 JSON |
 | 保存配置后没变化 | 配置写入 .env 后需要重启服务 |
+| WebUI 保存 Key 后仍显示未配置 | 看提示：若显示“已写入 .env，重启后生效”，重启即可；若仍“还没有保存”，确认 Key 输入框非空且没有勾选“清除已保存 Key” |
 | 400 / 模型不存在 | 使用 deepseek-flash 或 deepseek-v4-pro；旧模型名已过时 |
 | 402 | DeepSeek 余额不足，充值后重试 |
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AnswerRequest(BaseModel):
@@ -102,3 +102,11 @@ class ConfigUpdate(BaseModel):
     def _normalize_log_level(cls, value: str) -> str:
         value = value.strip().upper()
         return value or "INFO"
+
+    @model_validator(mode="after")
+    def _validate_secret_reset(self):
+        if self.clear_api_key and self.api_key:
+            raise ValueError("不能同时填写新 API Key 和勾选“清除已保存 Key”")
+        if self.clear_api_token and self.api_token:
+            raise ValueError("不能同时填写新 API Token 和勾选“清除已保存 Token”")
+        return self

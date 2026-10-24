@@ -66,6 +66,28 @@ def test_config_requires_local_or_token(tmp_path):
     assert "本机" in response.json()["detail"]
 
 
+def test_config_reports_saved_but_not_loaded_key(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text("DEEPSEEK_API_KEY='sk-saved'\n", encoding="utf-8")
+    client = make_client(tmp_path, deepseek_api_key="")
+    response = client.get("/api/config", headers=HEADERS)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["api_key_configured"] is True
+    assert body["api_key_loaded"] is False
+    assert body["restart_pending"] is True
+
+
+def test_save_rejects_key_and_clear_together(tmp_path):
+    client = make_client(tmp_path)
+    response = client.post(
+        "/api/config/save",
+        headers=HEADERS,
+        json={"api_key": "sk-new", "clear_api_key": True},
+    )
+    assert response.status_code == 422
+
+
 def test_test_connection_mock(tmp_path):
     client = make_client(tmp_path)
     response = client.post("/api/config/test", json={"provider": "mock"}, headers=HEADERS)
