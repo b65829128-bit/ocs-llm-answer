@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtualenv / uv local caches
+.venv/
+.uv-cache/
+.uv-python/
+
+# Tests and lint
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local secrets
+.env
+
+# Runtime data
+data/*.db
+data/*.db-*
+data/*.log
+
+# OS
+.DS_Store

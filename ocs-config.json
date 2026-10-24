@@ -1,0 +1,32 @@
+[
+  {
+    "name": "本地 LLM (DeepSeek)",
+    "homepage": "http://127.0.0.1:8787/docs",
+    "url": "http://127.0.0.1:8787/api/answer",
+    "method": "post",
+    "type": "GM_xmlhttpRequest",
+    "contentType": "json",
+    "responseType": "json",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "data": {
+      "question": {
+        "handler": "return (env) => env.suggestion_title || env.title || ''"
+      },
+      "options": {
+        "handler": "return (env) => String(env.suggestion_options || env.options || '').split(String.fromCharCode(10)).filter(Boolean)"
+      },
+      "images": {
+        "handler": "return (env) => Array.isArray(env.images) ? env.images : []"
+      },
+      "type": {
+        "handler": "return (env) => env.type || 'unknown'"
+      },
+      "site": {
+        "handler": "return () => { try { return location.host || ''; } catch (e) { return ''; } }"
+      }
+    },
+    "handler": "return (res) => { if (!res) return []; if (res.success === false || res.detail) throw new Error(res.error || res.detail || 'LLM 答题失败'); return res.ocs_format || []; }"
+  }
+]
