@@ -7,10 +7,12 @@ import json
 import logging
 import time
 import uuid
+from pathlib import Path
+from urllib.parse import urlparse
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from . import __version__
 from .answer import (
@@ -22,14 +24,29 @@ from .answer import (
     stringify_answer,
 )
 from .config import Settings, load_settings
-from .models import AnswerRequest
+from .models import AnswerRequest, ConfigUpdate
 from .prompts import build_messages, parse_llm_json
 from .providers import LLMError, build_provider, supports_vision
+from .setup import build_ocs_config, public_config, save_config, test_deepseek_connection
 from .storage import Storage
 
 VERSION = __version__
 PROMPT_VERSION = "prompt-v2"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 logger = logging.getLogger("ocs_llm")
+
+
+def _supplied_token(authorization: str | None, x_api_token: str | None) -> str:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    if x_api_token:
+        return x_api_token.strip()
+    return ""
+
+
+def _token_ok(settings: Settings, supplied: str) -> bool:
+    return bool(settings.api_token and supplied and hmac.compare_digest(supplied, settings.api_token))
 
 
 def _select_model(settings: Settings, qtype: str) -> str:
@@ -127,17 +144,69 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> None:
         if not settings.api_token:
             return
-        supplied = ""
-        if authorization and authorization.lower().startswith("bearer "):
-            supplied = authorization[7:].strip()
-        elif x_api_token:
-            supplied = x_api_token.strip()
-        if not supplied or not hmac.compare_digest(supplied, settings.api_token):
+        supplied = _supplied_token(authorization, x_api_token)
+        if not _token_ok(settings, supplied):
             raise HTTPException(status_code=401, detail="invalid API token")
 
-    @app.get("/")
+    async def require_admin(
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_api_token: str | None = Header(default=None, alias="X-API-Token"),
+    ) -> None:
+        # 已设置 API_TOKEN 时，配置接口始终要求口令。
+        if settings.api_token:
+            supplied = _supplied_token(authorization, x_api_token)
+            if not _token_ok(settings, supplied):
+                raise HTTPException(status_code=401, detail="invalid API token")
+            return
+
+        # 未设置口令时，配置写入只允许本机访问，避免局域网/网页 CSRF 修改 .env。
+        host = request.url.hostname or (request.client.host if request.client else "")
+        if host not in LOCAL_HOSTS:
+            raise HTTPException(
+                status_code=403,
+                detail="配置接口仅允许本机访问；如需远程配置，请先在 .env 设置 API_TOKEN。",
+            )
+        origin = request.headers.get("origin")
+        if origin is not None:
+            origin_host = urlparse(origin).hostname
+            if not origin_host or origin_host not in LOCAL_HOSTS:
+                raise HTTPException(status_code=403, detail="不允许跨站修改配置。")
+
+    @app.get("/", include_in_schema=False)
     async def root():
-        return RedirectResponse(url="/docs")
+        return RedirectResponse(url="/setup")
+
+    @app.get("/config", include_in_schema=False)
+    async def config_redirect():
+        return RedirectResponse(url="/setup")
+
+    @app.get("/setup", include_in_schema=False)
+    async def setup_page():
+        page = STATIC_DIR / "setup.html"
+        if not page.exists():
+            raise HTTPException(status_code=404, detail="setup page not found")
+        return FileResponse(page, media_type="text/html", headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/config", dependencies=[Depends(require_admin)])
+    async def get_config() -> dict:
+        return public_config(settings)
+
+    @app.post("/api/config/test", dependencies=[Depends(require_admin)])
+    async def test_config(payload: ConfigUpdate) -> dict:
+        return await test_deepseek_connection(payload, settings)
+
+    @app.post("/api/config/save", dependencies=[Depends(require_admin)])
+    async def save_config_route(payload: ConfigUpdate) -> dict:
+        try:
+            return await asyncio.to_thread(save_config, settings, payload)
+        except Exception as exc:
+            logger.exception("failed to save .env")
+            raise HTTPException(status_code=500, detail=f"保存配置失败：{exc}") from exc
+
+    @app.get("/api/ocs-config", dependencies=[Depends(require_admin)])
+    async def get_ocs_config() -> dict:
+        return {"config": build_ocs_config(settings)}
 
     @app.get("/health")
     async def health() -> dict:

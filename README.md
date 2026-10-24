@@ -3,6 +3,7 @@
 一个给 OCS（Online Course Script）用的**本地 LLM 答题服务**。它不改 OCS 源码，只实现 OCS 的 AnswererWrapper 协议：OCS 把题目/选项/题型/图片 POST 过来，服务返回 [题目, 答案, extra_data]，剩下的答案匹配、点选项、填空、结果面板、AI 标签全部由 OCS 自己完成。
 
 - 本地服务：默认 127.0.0.1:8787
+- 配置：内置 WebUI，打开 /setup 即可测试连接、生成 OCS 配置并保存 .env
 - 模型：DeepSeek OpenAI 兼容 /chat/completions
 - 项目管理：pyproject.toml + uv + uv.lock + CLI 入口
 - 零源码：只加一份 OCS 题库配置
@@ -59,6 +60,25 @@ LLM_PROVIDER=mock uv run ocs-llm-answerer
 ```
 
 mock 会按题型返回固定答案：单选 A、多选 AB、判断 对、填空 示例答案。它只用于验证格式和接入，不代表真实模型效果。
+
+### WebUI 配置（推荐）
+
+启动后打开：
+
+~~~text
+http://127.0.0.1:8787/setup
+~~~
+
+在页面里可以：
+
+- 填写 DeepSeek API Key、模型、Base URL；
+- 测试连接（会发送一次最小请求）；
+- 配置思考模式、超时、max_tokens、置信度；
+- 设置 HOST/PORT、API Token、SQLite、CORS；
+- 一键生成/复制/下载 OCS 题库配置；
+- 保存到 `.env`。
+
+保存后需要重启服务生效。配置页默认只允许本机访问；设置 API_TOKEN 后需要先输入口令。页面不会把已保存的 API Key 回传到浏览器。
 
 ### 验证
 
@@ -139,7 +159,7 @@ deepseek-v4-pro 不支持图片；如果强制用它做图片题，服务会退�
 
 服务对旧 deepseek-reasoner 保留了最小化请求分支，但旧模型名已不在官方当前文档中。请优先迁移到 deepseek-flash / deepseek-v4-pro；如果使用自定义兼容端点，可通过 LLM_THINKING=false 和服务端的 400 降级逻辑提高兼容性。
 
-## 3. 接入 OCS
+## 4. 接入 OCS
 
 1. 打开 OCS 面板：通用 -> 全局设置 -> 题库配置。
 2. 把 [ocs-config.json](ocs-config.json) 的内容粘贴进去，保存并启用。
@@ -171,7 +191,7 @@ Authorization: Bearer <token>
 
 也可以使用 X-API-Token 请求头。
 
-## 4. 接口
+## 5. 接口
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -179,7 +199,14 @@ Authorization: Bearer <token>
 | POST | /api/answer | 答题主接口 |
 | GET | /api/stats | 请求量、缓存命中、错误数、平均耗时、题型分布 |
 | POST | /api/cache/clear | 清空服务端缓存 |
+| GET | /setup | WebUI 配置器 |
+| GET | /api/config | 当前配置（API Key/Token 脱敏） |
+| POST | /api/config/test | 测试 DeepSeek 连接 |
+| POST | /api/config/save | 写入 .env（需重启） |
+| GET | /api/ocs-config | 生成当前 OCS 题库配置 |
 | GET | /docs | FastAPI 自动文档 |
+
+配置接口默认只允许本机；设置 API_TOKEN 后需要 `Authorization: Bearer <token>`。
 
 请求：
 
@@ -222,7 +249,7 @@ Authorization: Bearer <token>
 
 OCS 配置里的 handler 会把 success=false 或 detail 抛成错误，结果面板会显示错误信息；ocs_format=[] 则显示 0 个结果。
 
-## 5. 配置项
+## 6. 配置项
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
@@ -246,7 +273,7 @@ OCS 配置里的 handler 会把 success=false 或 detail 抛成错误，结果�
 | CORS_ORIGINS | * | CORS；自用可保持 |
 | LOG_LEVEL | INFO | 日志级别 |
 
-## 6. 项目管理
+## 7. 项目管理
 
 本项目使用 pyproject.toml + uv：
 
@@ -275,27 +302,32 @@ ocs-llm-answerer/
 │   ├── models.py            请求模型
 │   ├── answer.py            选项/答案归一化与校验
 │   ├── prompts.py           prompt（含图片内容块）+ LLM JSON 解析
+│   ├── setup.py             WebUI 配置读写/连接测试/OCS 配置生成
 │   ├── storage.py           SQLite 缓存/日志
+│   ├── static/setup.html    WebUI 配置页面
 │   └── providers/           DeepSeek / mock
-├── tests/
+├── tests/                   单元测试 + API/WebUI 配置测试
 ├── ocs-config.json          OCS 题库配置
 ├── pyproject.toml
 ├── uv.lock
 ├── .python-version
 ├── .env.example
+├── .github/workflows/ci.yml
+├── LICENSE
+├── CONTRIBUTING.md
 ├── README.md
 └── DEVELOPMENT.md
 ```
 
-## 7. 测试
+## 8. 测试
 
 ```bash
 uv run pytest
 ```
 
-当前覆盖：选项标签清洗、单选/多选/判断/填空答案归一化、题型推断、API 主流程、缓存、图片缓存隔离、低置信度、鉴权、字符串 options、统计、DeepSeek thinking/vision payload、JSON 解析。
+当前 36 个用例，覆盖：选项/答案归一化、题型推断、API 主流程、缓存、图片缓存隔离、低置信度、鉴权、字符串 options、统计、DeepSeek thinking/vision payload、JSON 解析，以及 WebUI 配置读取/脱敏、保存 .env、连接测试、OCS 配置生成和本机/Token 保护。
 
-## 8. 常见问题
+## 9. 常见问题
 
 | 现象 | 处理 |
 |---|---|
@@ -309,15 +341,24 @@ uv run pytest
 | 答案对但 OCS 没点上 | 看 /api/stats 和日志；确认题型/选项文本；OCS resolver 对纯字母有兜底 |
 | 填空题多空失败 | OCS 不传空数；服务从题干 ____ 推断，推断不到时只返回单段 |
 | 改了 prompt 但答案没变 | 清空 OCS 题库缓存；服务端缓存可用 POST /api/cache/clear 清 |
-| 401 | OCS 配置的 headers 里加 Authorization: Bearer <token> |
+| 401 | OCS 配置的 headers 里加 Authorization: Bearer <token>；配置页需要输入 API Token |
+| 配置页 403 | 配置接口只允许本机；远程访问请先设置 API_TOKEN，并通过 token 访问 |
+| 保存配置后没变化 | 配置写入 .env 后需要重启服务 |
 | 400 / 模型不存在 | 使用 deepseek-flash 或 deepseek-v4-pro；旧模型名已过时 |
 | 402 | DeepSeek 余额不足，充值后重试 |
 
-## 9. 安全
+## 10. 安全
 
 - 默认只绑 127.0.0.1，不要随意改成 0.0.0.0。
-- DeepSeek key 只放服务端 .env，不要写进 OCS 配置。
+- 配置 WebUI 默认只允许本机修改；设置 API_TOKEN 后配置接口也要求 Token，防止局域网/跨站修改 .env。
+- DeepSeek key 只放服务端 .env，不要写进 OCS 配置；配置页不会把已保存 Key 回传浏览器。
 - 公网/局域网部署时设置 API_TOKEN，并限制防火墙/CORS。
 - 课程题目和图片会发给 DeepSeek；确认数据保留策略，敏感课程慎用。
 - 日志默认记录题干/选项，不记录图片 base64；注意清理和备份权限。
 - 仅用于自建/授权课程或学习辅助，遵守课程平台条款。
+
+## 11. License
+
+MIT，见 [LICENSE](LICENSE)。欢迎 PR；开发与提交前检查见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+GitHub Actions 会在 push / pull request 时执行 uv sync --frozen、uv run pytest 和 CLI 版本检查。

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 
 import uvicorn
 
@@ -32,6 +33,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
+    # 让运行中的 /api/config 和 OCS 配置生成能反映 CLI 传入的地址/端口。
+    os.environ["HOST"] = args.host
+    os.environ["PORT"] = str(args.port)
     uvicorn.run(
         "app.main:app",
         host=args.host,

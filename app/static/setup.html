@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OCS LLM Answerer · 配置</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --text: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --green: #15803d;
+      --green-bg: #ecfdf3;
+      --red: #b91c1c;
+      --red-bg: #fef2f2;
+      --amber: #92400e;
+      --amber-bg: #fffbeb;
+      --radius: 18px;
+      --shadow: 0 18px 50px rgba(15, 23, 42, .07);
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 8% -8%, #dbeafe 0, transparent 34%),
+        radial-gradient(circle at 100% 0, #dcfce7 0, transparent 26%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      line-height: 1.55;
+    }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, .82);
+      border-bottom: 1px solid rgba(226, 232, 240, .9);
+    }
+    .topbar-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.02em; }
+    .brand-mark {
+      width: 32px; height: 32px; border-radius: 10px;
+      display: grid; place-items: center;
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      color: #fff; font-size: 15px;
+    }
+    .brand small { color: var(--muted); font-weight: 600; letter-spacing: 0; }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid var(--line); background: var(--surface);
+      border-radius: 999px; padding: 7px 12px;
+      font-size: 12px; color: var(--muted); white-space: nowrap;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+    .status-pill.ok .dot { background: #22c55e; box-shadow: 0 0 0 4px #dcfce7; }
+    .status-pill.bad .dot { background: #ef4444; box-shadow: 0 0 0 4px #fee2e2; }
+    main { max-width: 1080px; margin: 0 auto; padding: 34px 20px 90px; }
+    .hero {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 24px; margin-bottom: 24px;
+    }
+    .hero h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 40px); letter-spacing: -.035em; line-height: 1.15; }
+    .hero p { margin: 0; color: var(--muted); max-width: 680px; }
+    .hero-links { display: flex; gap: 10px; flex-wrap: wrap; }
+    .hero-links a {
+      border: 1px solid var(--line); background: var(--surface);
+      border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 600;
+      color: var(--text); white-space: nowrap;
+    }
+    .alert {
+      border-radius: 12px; padding: 12px 14px; margin: 14px 0;
+      border: 1px solid var(--line); background: var(--surface);
+      font-size: 14px;
+    }
+    .alert.success { border-color: #bbf7d0; background: var(--green-bg); color: var(--green); }
+    .alert.error { border-color: #fecaca; background: var(--red-bg); color: var(--red); }
+    .alert.warn { border-color: #fde68a; background: var(--amber-bg); color: var(--amber); }
+    .alert.info { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-top: 18px;
+      box-shadow: var(--shadow);
+    }
+    .section-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 20px; }
+    .step {
+      flex: 0 0 auto; width: 32px; height: 32px; border-radius: 10px;
+      display: grid; place-items: center;
+      background: #eff6ff; color: var(--primary);
+      font-size: 13px; font-weight: 800;
+    }
+    .section-head h2 { margin: 0 0 3px; font-size: 18px; letter-spacing: -.01em; }
+    .section-head p { margin: 0; color: var(--muted); font-size: 13px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .span2 { grid-column: 1 / -1; }
+    .field { display: flex; flex-direction: column; gap: 7px; font-size: 13px; font-weight: 650; color: #334155; }
+    .field small { color: var(--muted); font-weight: 500; font-size: 12px; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface-soft);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: #93c5fd;
+      background: #fff;
+      box-shadow: 0 0 0 4px #eff6ff;
+    }
+    input[type="checkbox"] { width: auto; accent-color: var(--primary); }
+    .check { flex-direction: row; align-items: center; gap: 9px; font-weight: 600; padding-top: 23px; }
+    .check span { font-size: 13px; }
+    .secret-row { display: flex; gap: 12px; align-items: center; }
+    .secret-row input { flex: 1; }
+    .inline-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+    .hint { margin: 12px 0 0; color: var(--muted); font-size: 12.5px; }
+    .warn { margin: 14px 0 0; color: var(--amber); font-size: 12.5px; }
+    .actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    button {
+      border: 0; border-radius: 10px; padding: 10px 15px;
+      font: inherit; font-size: 13.5px; font-weight: 700;
+      cursor: pointer; transition: transform .12s, background .15s, opacity .15s;
+    }
+    button:active { transform: translateY(1px); }
+    button:disabled { opacity: .55; cursor: wait; }
+    .primary { background: var(--primary); color: #fff; }
+    .primary:hover { background: var(--primary-dark); }
+    .secondary { background: #eff6ff; color: var(--primary); border: 1px solid #bfdbfe; }
+    .ghost { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+    .danger-ghost { background: #fff; color: var(--red); border: 1px solid #fecaca; }
+    .test-result { font-size: 13px; color: var(--muted); }
+    .test-result.ok { color: var(--green); }
+    .test-result.bad { color: var(--red); }
+    details { margin-top: 18px; border-top: 1px dashed var(--line); padding-top: 15px; }
+    summary { cursor: pointer; font-size: 13px; font-weight: 700; color: #334155; }
+    details .grid { margin-top: 15px; }
+    .code {
+      margin: 14px 0 0;
+      padding: 16px;
+      border-radius: 12px;
+      background: #0f172a;
+      color: #e2e8f0;
+      overflow: auto;
+      max-height: 440px;
+      font-size: 12.5px;
+      line-height: 1.6;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      white-space: pre;
+    }
+    .subcard {
+      background: var(--surface-soft);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .subcard strong { color: var(--text); }
+    .savebar {
+      position: sticky; bottom: 14px; z-index: 15;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      margin-top: 20px; padding: 14px 16px;
+      background: rgba(255, 255, 255, .92);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 14px 40px rgba(15, 23, 42, .12);
+      backdrop-filter: blur(14px);
+    }
+    .savebar p { margin: 0; font-size: 12.5px; color: var(--muted); }
+    .auth-card { border-color: #bfdbfe; }
+    .auth-card .actions { margin-top: 12px; }
+    footer { max-width: 1080px; margin: 0 auto; padding: 0 20px 40px; color: var(--muted); font-size: 12px; }
+    .footer-inner { border-top: 1px solid var(--line); padding-top: 18px; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    @media (max-width: 760px) {
+      .topbar-inner, main, footer { padding-left: 14px; padding-right: 14px; }
+      main { padding-top: 22px; }
+      .hero { flex-direction: column; align-items: flex-start; }
+      .grid { grid-template-columns: 1fr; }
+      .span2 { grid-column: auto; }
+      .card { padding: 18px; }
+      .savebar { align-items: stretch; flex-direction: column; }
+      .savebar button { width: 100%; }
+      .status-pill { max-width: 48vw; overflow: hidden; text-overflow: ellipsis; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark">AI</div>
+        <div>OCS LLM Answerer <small id="version">v0.3.0</small></div>
+      </div>
+      <div id="status-pill" class="status-pill"><span class="dot"></span><span id="status-text">检查服务状态…</span></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <h1>配置你的本地答题器</h1>
+        <p>填好 DeepSeek 连接信息，保存到 <code>.env</code>，再把右侧生成的 OCS 配置粘贴到题库设置即可。所有配置都在本机完成。</p>
+      </div>
+      <div class="hero-links">
+        <a href="/docs" target="_blank" rel="noreferrer">API 文档</a>
+        <a href="/health" target="_blank" rel="noreferrer">健康检查</a>
+        <a href="https://api-docs.deepseek.com/zh-cn/" target="_blank" rel="noreferrer">DeepSeek 文档</a>
+      </div>
+    </section>
+
+    <div id="alert" class="alert" hidden></div>
+
+    <section id="auth-card" class="card auth-card" hidden>
+      <div class="section-head">
+        <div class="step">锁</div>
+        <div>
+          <h2>需要管理口令</h2>
+          <p>当前服务已设置 API_TOKEN。输入后才能读取或修改配置。</p>
+        </div>
+      </div>
+      <label class="field">API Token
+        <input id="auth-token" type="password" autocomplete="current-password" placeholder="输入 .env 里的 API_TOKEN">
+      </label>
+      <div class="actions">
+        <button type="button" class="primary" id="auth-btn">验证并加载</button>
+        <span class="hint">口令只保存在当前浏览器会话，不会写入页面。</span>
+      </div>
+    </section>
+
+    <form id="config-form">
+      <section class="card">
+        <div class="section-head">
+          <div class="step">1</div>
+          <div>
+            <h2>DeepSeek 连接</h2>
+            <p>默认使用 deepseek-flash（支持图片）；需要更强文本推理可换 deepseek-v4-pro。</p>
+          </div>
+        </div>
+        <div class="grid">
+          <label class="field">提供方
+            <select id="provider">
+              <option value="deepseek">DeepSeek</option>
+              <option value="mock">Mock（离线联调）</option>
+            </select>
+          </label>
+          <label class="field">默认模型
+            <input id="model" list="model-options" placeholder="deepseek-flash" autocomplete="off">
+            <datalist id="model-options">
+              <option value="deepseek-flash"></option>
+              <option value="deepseek-v4-pro"></option>
+            </datalist>
+          </label>
+          <label class="field span2">Base URL
+            <input id="base_url" placeholder="https://api.deepseek.com" autocomplete="off">
+            <small>OpenAI 兼容地址，通常不需要改。</small>
+          </label>
+          <label class="field span2">DeepSeek API Key
+            <div class="secret-row">
+              <input id="api_key" type="password" autocomplete="new-password" placeholder="sk-...">
+              <label class="inline-check"><input id="clear_api_key" type="checkbox"> 清除已保存 Key</label>
+            </div>
+            <small id="api-key-hint">留空表示保持现有 Key 不变。</small>
+          </label>
+        </div>
+        <div class="actions">
+          <button type="button" class="secondary" id="test-btn">测试连接</button>
+          <span id="test-result" class="test-result">测试会向 DeepSeek 发送一次最小请求，消耗少量 token。</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div class="step">2</div>
+          <div>
+            <h2>答题参数</h2>
+            <p>默认关闭思考模式以保证响应速度；难题可以开启，并适当提高最大输出。</p>
+          </div>
+        </div>
+        <div class="grid">
+          <label class="check"><input id="thinking" type="checkbox"><span>开启思考模式</span></label>
+          <label class="field">思考强度
+            <select id="reasoning_effort">
+              <option value="low">low（更快）</option>
+              <option value="high">high（默认）</option>
+              <option value="max">max（更慢更稳）</option>
+            </select>
+          </label>
+          <label class="field">请求超时（秒）
+            <input id="timeout_seconds" type="number" min="1" max="300" step="1">
+            <small>OCS 默认 60 秒硬超时，建议 45 左右。</small>
+          </label>
+          <label class="field">最大输出 tokens
+            <input id="max_tokens" type="number" min="1" max="393216" step="1">
+            <small>思考模式建议 4096+。</small>
+          </label>
+          <label class="field">temperature
+            <input id="temperature" type="number" min="0" max="2" step="0.1">
+            <small>思考模式下不会发送。</small>
+          </label>
+          <label class="field">最低置信度
+            <input id="min_confidence" type="number" min="0" max="1" step="0.01">
+            <small>低于该值返回空，让 OCS 标记未答。</small>
+          </label>
+          <label class="check span2"><input id="use_json_mode" type="checkbox"><span>启用 JSON Output（推荐）</span></label>
+        </div>
+        <details>
+          <summary>按题型覆盖模型（可选）</summary>
+          <div class="grid">
+            <label class="field">单选题模型<input id="model_single" placeholder="留空使用默认模型"></label>
+            <label class="field">多选题模型<input id="model_multiple" placeholder="留空使用默认模型"></label>
+            <label class="field">判断题模型<input id="model_judgement" placeholder="留空使用默认模型"></label>
+            <label class="field">填空题模型<input id="model_completion" placeholder="留空使用默认模型"></label>
+          </div>
+        </details>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div class="step">3</div>
+          <div>
+            <h2>服务设置</h2>
+            <p>本地自用保持 127.0.0.1 即可；开放到局域网前请务必设置 API Token。</p>
+          </div>
+        </div>
+        <div class="grid">
+          <label class="field">监听地址
+            <input id="host" placeholder="127.0.0.1" autocomplete="off">
+          </label>
+          <label class="field">端口
+            <input id="port" type="number" min="1" max="65535" step="1">
+          </label>
+          <label class="field span2">API Token（管理口令）
+            <div class="secret-row">
+              <input id="api_token" type="password" autocomplete="new-password" placeholder="留空表示不设置">
+              <label class="inline-check"><input id="clear_api_token" type="checkbox"> 清除已保存 Token</label>
+            </div>
+            <small>设置后，答题接口和配置页都需要 Bearer Token。</small>
+          </label>
+          <label class="field">SQLite 路径
+            <input id="db_path" placeholder="data/ocs_llm.db" autocomplete="off">
+          </label>
+          <label class="field">缓存 TTL（秒）
+            <input id="cache_ttl_seconds" type="number" min="0" step="1">
+            <small>0 表示禁用服务端缓存。</small>
+          </label>
+          <label class="field">CORS Origins
+            <input id="cors_origins" placeholder="*" autocomplete="off">
+          </label>
+          <label class="field">日志级别
+            <select id="log_level">
+              <option value="DEBUG">DEBUG</option>
+              <option value="INFO">INFO</option>
+              <option value="WARNING">WARNING</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+          </label>
+        </div>
+        <div class="subcard">
+          <strong>当前配置文件：</strong><code id="env-file">.env</code><br>
+          修改 HOST / PORT / 模型 / 思考模式 / API Token 后，需要重启服务才会生效。<br>
+          如果启动时传了 <code>--host</code> / <code>--port</code>，命令行参数优先于 .env。
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div class="step">4</div>
+          <div>
+            <h2>OCS 题库配置</h2>
+            <p>复制下面内容到 OCS：通用 → 全局设置 → 题库配置，保存并启用。</p>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="secondary" id="refresh-ocs">生成 / 刷新</button>
+          <button type="button" class="ghost" id="copy-ocs">复制 JSON</button>
+          <button type="button" class="ghost" id="download-ocs">下载 JSON</button>
+        </div>
+        <pre id="ocs-preview" class="code">加载中…</pre>
+        <p class="hint">配置会自动使用当前表单里的 host/port。若已设置 API Token，预览里会出现 <code>Bearer YOUR_API_TOKEN</code> 占位符，请替换成实际 Token。</p>
+      </section>
+
+      <div class="savebar">
+        <p id="save-note">保存后会写入 <code>.env</code>，需要重启服务生效。</p>
+        <button type="submit" class="primary" id="save-btn">保存到 .env</button>
+      </div>
+    </form>
+
+    <section class="card">
+      <div class="section-head">
+        <div class="step">▶</div>
+        <div>
+          <h2>启动 / 重启</h2>
+          <p>推荐用 uv 管理环境。配置保存后，在终端重新启动即可。</p>
+        </div>
+      </div>
+      <pre class="code">uv sync
+uv run ocs-llm-answerer</pre>
+      <p class="hint">开发时可用 <code>uv run ocs-llm-answerer --reload</code>，保存代码后自动重载。</p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span>OCS LLM Answerer · local-first · MIT</span>
+      <span>配置只保存在本机 <code>.env</code>，API Key 不会返回浏览器。</span>
+    </div>
+  </footer>
+
+  <script>
+    "use strict";
+
+    var state = {
+      token: sessionStorage.getItem("ocs_setup_token") || "",
+      config: null,
+      ocsTemplate: null,
+      ocsText: ""
+    };
+
+    function byId(id) { return document.getElementById(id); }
+
+    function setAlert(message, kind) {
+      var el = byId("alert");
+      if (!message) { el.hidden = true; el.textContent = ""; return; }
+      el.className = "alert " + (kind || "info");
+      el.textContent = message;
+      el.hidden = false;
+      if (kind === "success") { window.scrollTo({ top: 0, behavior: "smooth" }); }
+    }
+
+    function setStatus(text, ok) {
+      byId("status-text").textContent = text;
+      byId("status-pill").className = "status-pill " + (ok ? "ok" : "bad");
+    }
+
+    function setTest(text, kind) {
+      var el = byId("test-result");
+      el.className = "test-result" + (kind ? " " + kind : "");
+      el.textContent = text;
+    }
+
+    function authHeaders(extra) {
+      var headers = Object.assign({}, extra || {});
+      if (state.token) { headers.Authorization = "Bearer " + state.token; }
+      return headers;
+    }
+
+    async function api(path, options) {
+      options = options || {};
+      var headers = authHeaders(options.headers || {});
+      if (options.body) { headers["Content-Type"] = "application/json"; }
+      var response = await fetch(path, Object.assign({}, options, { headers: headers }));
+      var text = await response.text();
+      var data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (err) { data = { detail: text }; }
+      if (!response.ok) {
+        var message = data.detail || data.error || response.statusText || ("HTTP " + response.status);
+        if (Array.isArray(message)) {
+          message = message.map(function (item) { return item.msg || JSON.stringify(item); }).join("；");
+        }
+        var error = new Error(message);
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+      return data;
+    }
+
+    function value(id) { return byId(id).value; }
+    function numberValue(id) { return Number(byId(id).value); }
+    function checked(id) { return byId(id).checked; }
+
+    function payload() {
+      return {
+        host: value("host").trim(),
+        port: numberValue("port"),
+        provider: value("provider"),
+        api_key: value("api_key"),
+        clear_api_key: checked("clear_api_key"),
+        base_url: value("base_url").trim(),
+        model: value("model").trim(),
+        model_single: value("model_single").trim(),
+        model_multiple: value("model_multiple").trim(),
+        model_judgement: value("model_judgement").trim(),
+        model_completion: value("model_completion").trim(),
+        thinking: checked("thinking"),
+        reasoning_effort: value("reasoning_effort"),
+        timeout_seconds: numberValue("timeout_seconds"),
+        max_tokens: numberValue("max_tokens"),
+        temperature: numberValue("temperature"),
+        use_json_mode: checked("use_json_mode"),
+        min_confidence: numberValue("min_confidence"),
+        api_token: value("api_token"),
+        clear_api_token: checked("clear_api_token"),
+        db_path: value("db_path").trim(),
+        cache_ttl_seconds: numberValue("cache_ttl_seconds"),
+        cors_origins: value("cors_origins").trim(),
+        log_level: value("log_level")
+      };
+    }
+
+    function updateSecretHints() {
+      var keyConfigured = state.config && state.config.api_key_configured;
+      var tokenConfigured = state.config && state.config.api_token_configured;
+      byId("api_key").placeholder = keyConfigured ? "已配置，留空不修改" : "sk-...";
+      byId("api-key-hint").textContent = keyConfigured
+        ? "已保存 Key。留空保持不变；勾选右侧可清除。"
+        : "还没有保存 Key，填入后保存。";
+      byId("api_token").placeholder = tokenConfigured ? "已配置，留空不修改" : "留空表示不设置";
+    }
+
+    function fillForm(config) {
+      state.config = config;
+      byId("host").value = config.host;
+      byId("port").value = config.port;
+      byId("provider").value = config.provider;
+      byId("base_url").value = config.base_url;
+      byId("model").value = config.model;
+      byId("model_single").value = config.model_single;
+      byId("model_multiple").value = config.model_multiple;
+      byId("model_judgement").value = config.model_judgement;
+      byId("model_completion").value = config.model_completion;
+      byId("thinking").checked = !!config.thinking;
+      byId("reasoning_effort").value = config.reasoning_effort || "high";
+      byId("timeout_seconds").value = config.timeout_seconds;
+      byId("max_tokens").value = config.max_tokens;
+      byId("temperature").value = config.temperature;
+      byId("use_json_mode").checked = !!config.use_json_mode;
+      byId("min_confidence").value = config.min_confidence;
+      byId("db_path").value = config.db_path;
+      byId("cache_ttl_seconds").value = config.cache_ttl_seconds;
+      byId("cors_origins").value = config.cors_origins;
+      byId("log_level").value = config.log_level;
+      byId("api_key").value = "";
+      byId("api_token").value = "";
+      byId("clear_api_key").checked = false;
+      byId("clear_api_token").checked = false;
+      byId("env-file").textContent = config.env_file;
+      byId("version").textContent = "v" + config.version;
+      updateSecretHints();
+    }
+
+    function ocsHost() {
+      var host = value("host").trim() || "127.0.0.1";
+      if (host === "0.0.0.0" || host === "::") { host = "127.0.0.1"; }
+      if (host.indexOf(":") >= 0 && host.charAt(0) !== "[") { host = "[" + host + "]"; }
+      return host;
+    }
+
+    function updateOcs() {
+      if (!state.ocsTemplate) { return; }
+      var wrapper = JSON.parse(JSON.stringify(state.ocsTemplate));
+      var base = "http://" + ocsHost() + ":" + (value("port") || "8787");
+      wrapper.homepage = base + "/setup";
+      wrapper.url = base + "/api/answer";
+      var tokenWillBeSet = !checked("clear_api_token") && (value("api_token") || (state.config && state.config.api_token_configured));
+      if (tokenWillBeSet) {
+        wrapper.headers.Authorization = "Bearer YOUR_API_TOKEN";
+      } else {
+        delete wrapper.headers.Authorization;
+      }
+      state.ocsText = JSON.stringify(wrapper, null, 2);
+      byId("ocs-preview").textContent = state.ocsText;
+    }
+
+    async function loadHealth() {
+      try {
+        var response = await fetch("/health");
+        var data = await response.json();
+        if (data.status === "ok") {
+          setStatus("运行中 · " + data.provider + " · " + data.model, true);
+        } else {
+          setStatus("待配置 · " + (data.status || "unknown"), false);
+        }
+      } catch (err) {
+        setStatus("服务未连接", false);
+      }
+    }
+
+    async function loadOcs() {
+      try {
+        var data = await api("/api/ocs-config");
+        state.ocsTemplate = data.config[0];
+        updateOcs();
+      } catch (err) {
+        byId("ocs-preview").textContent = "生成失败：" + err.message;
+      }
+    }
+
+    async function loadConfig() {
+      try {
+        var config = await api("/api/config");
+        fillForm(config);
+        byId("auth-card").hidden = true;
+        setAlert("");
+        await loadOcs();
+      } catch (err) {
+        if (err.status === 401) {
+          byId("auth-card").hidden = false;
+          setAlert("当前服务已设置 API Token，请先输入管理口令。", "warn");
+        } else if (err.status === 403) {
+          setAlert(err.message, "error");
+        } else {
+          setAlert("读取配置失败：" + err.message, "error");
+        }
+      }
+    }
+
+    async function authenticate() {
+      var token = byId("auth-token").value.trim();
+      if (!token) { setAlert("请输入 API Token。", "warn"); return; }
+      state.token = token;
+      sessionStorage.setItem("ocs_setup_token", token);
+      await loadConfig();
+      if (byId("auth-card").hidden) {
+        byId("auth-token").value = "";
+      } else {
+        state.token = "";
+        sessionStorage.removeItem("ocs_setup_token");
+      }
+    }
+
+    async function testConnection() {
+      var button = byId("test-btn");
+      button.disabled = true;
+      setTest("正在连接 DeepSeek…", "");
+      try {
+        var result = await api("/api/config/test", { method: "POST", body: JSON.stringify(payload()) });
+        if (result.ok) {
+          setTest(result.message + (result.latency_ms ? "（" + result.latency_ms + "ms）" : ""), "ok");
+        } else {
+          setTest(result.message || "连接失败", "bad");
+        }
+      } catch (err) {
+        setTest("测试失败：" + err.message, "bad");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function saveConfig(event) {
+      event.preventDefault();
+      var button = byId("save-btn");
+      var form = payload();
+      button.disabled = true;
+      button.textContent = "保存中…";
+      try {
+        var result = await api("/api/config/save", { method: "POST", body: JSON.stringify(form) });
+        state.config.api_key_configured = result.api_key_configured;
+        state.config.api_token_configured = result.api_token_configured;
+        byId("api_key").value = "";
+        byId("api_token").value = "";
+        byId("clear_api_key").checked = false;
+        byId("clear_api_token").checked = false;
+        updateSecretHints();
+        updateOcs();
+        setAlert("配置已保存到 " + result.env_file + "。请重启服务使其生效。", "success");
+        if (form.clear_api_token) {
+          setAlert("配置已保存，API Token 已清除。重启后配置页不再需要口令。", "warn");
+        } else if (form.api_token) {
+          setAlert("配置已保存。重启后配置页将要求输入新的 API Token。", "warn");
+        }
+      } catch (err) {
+        setAlert("保存失败：" + err.message, "error");
+      } finally {
+        button.disabled = false;
+        button.textContent = "保存到 .env";
+      }
+    }
+
+    async function copyOcs() {
+      if (!state.ocsText) { return; }
+      try {
+        await navigator.clipboard.writeText(state.ocsText);
+      } catch (err) {
+        var ta = document.createElement("textarea");
+        ta.value = state.ocsText;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      var button = byId("copy-ocs");
+      var text = button.textContent;
+      button.textContent = "已复制";
+      setTimeout(function () { button.textContent = text; }, 1400);
+    }
+
+    function downloadOcs() {
+      if (!state.ocsText) { return; }
+      var blob = new Blob([state.ocsText], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+      link.href = url;
+      link.download = "ocs-config.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    byId("test-btn").addEventListener("click", testConnection);
+    byId("config-form").addEventListener("submit", saveConfig);
+    byId("auth-btn").addEventListener("click", authenticate);
+    byId("auth-token").addEventListener("keydown", function (event) {
+      if (event.key === "Enter") { event.preventDefault(); authenticate(); }
+    });
+    byId("refresh-ocs").addEventListener("click", loadOcs);
+    byId("copy-ocs").addEventListener("click", copyOcs);
+    byId("download-ocs").addEventListener("click", downloadOcs);
+    ["host", "port", "api_token", "clear_api_token"].forEach(function (id) {
+      byId(id).addEventListener("input", updateOcs);
+      byId(id).addEventListener("change", updateOcs);
+    });
+
+    loadHealth();
+    loadConfig();
+  </script>
+</body>
+</html>

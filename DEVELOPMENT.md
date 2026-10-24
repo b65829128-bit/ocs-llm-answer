@@ -1,6 +1,6 @@
 # OCS LLM Answerer 开发文档
 
-> 版本：0.2.0 · 日期：2026-10-24 · 形态：本地自用 MVP · 项目管理：uv + pyproject + uv.lock
+> 版本：0.3.0 · 日期：2026-10-24 · 形态：本地自用 MVP + WebUI 配置器 · 项目管理：uv + pyproject + uv.lock
 >
 > 代码：`app/` · 启动：`uv run ocs-llm-answerer` · OCS 配置：`ocs-config.json`
 
@@ -23,6 +23,7 @@ OCS 的自动答题可以拆成三层：
 - 本地服务，默认只监听 `127.0.0.1:8787`；
 - 用 `pyproject.toml + uv + uv.lock` 管理依赖和 Python 版本，不再依赖 shell 启动脚本；
 - 提供 `ocs-llm-answerer` CLI 入口，同时保留 `uv run uvicorn app.main:app` 的调试方式；
+- 内置 WebUI 配置器（`/setup`）：编辑配置、测试连接、生成 OCS 配置、保存 `.env`，降低首次配置门槛；
 - 优先兼容 DeepSeek 当前 API：`deepseek-flash` / `deepseek-v4-pro`、Chat Completions、JSON Output、Thinking Mode、Vision；
 - 不改 OCS 源码，只通过 [ocs-config.json](ocs-config.json) 接入；
 - 一轮直出可用：有 `mock` 模式，没有 API key 也能先验证链路；
@@ -43,7 +44,9 @@ OCS 的自动答题可以拆成三层：
 一轮完成后，以下全部满足即视为可用：
 
 - `uv sync` 能创建环境并安装项目；
-- `uv run pytest` 全部通过；
+- `uv run pytest` 全部通过（含 WebUI 配置 API 测试）；
+- `GET /setup` 返回配置页，能读取脱敏配置、测试连接并保存 `.env`；
+- 配置接口默认只允许本机，设置 `API_TOKEN` 后需要 Token；
 - `GET /health` 返回 `status=ok`，并显示 model/thinking/vision；
 - `LLM_PROVIDER=mock` 时，单选题返回 `A`，判断题返回 `对`，多选题返回 `AB`，填空题返回非空文本；
 - 填入真实 DeepSeek key 后，单选题能返回合法选项字母；
@@ -84,6 +87,10 @@ OCS 的自动答题可以拆成三层：
 ## 3. 总体架构
 
 ```text
+浏览器 /setup
+  └─ GET/POST /api/config[.test|.save], /api/ocs-config
+       └─ setup.py：读配置 / 脱敏 / 测试连接 / 写 .env / 生成 OCS JSON
+
 OCS 页面
   └─ AnswererWrapper（GM_xmlhttpRequest / fetch）
        └─ POST http://127.0.0.1:8787/api/answer
@@ -100,8 +107,10 @@ OCS 页面
 
 | 模块 | 职责 |
 |---|---|
-| `app/cli.py` | `ocs-llm-answerer` 命令，解析 host/port/reload/log-level |
-| `app/main.py` | FastAPI 路由、鉴权、缓存/日志编排、超时 |
+| `app/cli.py` | `ocs-llm-answerer` 命令，解析 host/port/reload/log-level，并把地址同步给配置接口 |
+| `app/main.py` | FastAPI 路由、鉴权、缓存/日志编排、超时、WebUI 路由 |
+| `app/setup.py` | 配置读取/脱敏、`.env` 写入、DeepSeek 连接测试、OCS 配置生成 |
+| `app/static/setup.html` | 单页 WebUI 配置器（无前端构建、无 CDN） |
 | `app/config.py` | 从 `.env` 读取配置 |
 | `app/models.py` | 请求模型与字段归一化 |
 | `app/answer.py` | 选项标签清洗、题型推断、答案归一化/校验 |
@@ -201,9 +210,20 @@ OCS 配置里的 `handler` 会把 `success=false` 或 `detail` 抛成错误，�
 | GET | `/health` | provider/model/configured/thinking/reasoning_effort/vision/version | 否 |
 | GET | `/api/stats` | 请求量、缓存命中、错误数、平均耗时、题型分布 | 可选 token |
 | POST | `/api/cache/clear` | 清空服务端缓存 | 可选 token |
+| GET | `/setup` | WebUI 配置器 | 否 |
+| GET | `/api/config` | 当前配置（Key/Token 脱敏） | 本机或 token |
+| POST | `/api/config/test` | 测试 DeepSeek 连接 | 本机或 token |
+| POST | `/api/config/save` | 写入 `.env`，返回 restart_required | 本机或 token |
+| GET | `/api/ocs-config` | 生成当前 OCS 配置 | 本机或 token |
 | GET | `/docs` | Swagger 文档 | 否 |
 
-### 5.3 鉴权
+配置接口的权限规则：
+
+- 未设置 `API_TOKEN`：只允许 `127.0.0.1` / `localhost` / `::1`，并拒绝跨站 Origin；
+- 设置 `API_TOKEN`：需要 `Authorization: Bearer <token>` 或 `X-API-Token`，远程也适用；
+- 保存后返回 `restart_required=true`，当前进程不会热加载配置。
+
+### 5.4 鉴权
 
 `.env` 设置 `API_TOKEN` 后，请求需要：
 
@@ -461,7 +481,8 @@ OCS 会并行请求所有启用的 wrapper，没有优先级。题库 + LLM 同�
 ## 12. 安全
 
 - **只绑 localhost**：默认 `127.0.0.1`；改 `0.0.0.0` 前先设 `API_TOKEN` 和防火墙；
-- **Key 只在服务端**：不要写进 OCS 题库配置；
+- **配置页保护**：未设 `API_TOKEN` 时配置接口只允许本机并拒绝跨站 Origin；设 Token 后远程也需 Token；
+- **Key 只在服务端**：不要写进 OCS 题库配置；WebUI 只返回 `api_key_configured`，不回传 Key；
 - **CORS**：默认 `*` 方便自用；公网部署改成固定 origin；
 - **XSS**：OCS 结果面板用 `innerHTML` 展示答案；填空文本理论上可注入，公网/多用户需清洗；
 - **Prompt injection**：题干是用户内容，JSON 包裹 + system 约束只能降低影响，不是安全边界；
@@ -479,7 +500,7 @@ OCS 会并行请求所有启用的 wrapper，没有优先级。题库 + LLM 同�
 uv run pytest
 ```
 
-当前 28 个用例，覆盖：
+当前 36 个用例，覆盖：
 
 - 选项标签清洗与 A/B/C 重排；
 - 单选字母/文本/“答案是B”；
@@ -490,7 +511,8 @@ uv run pytest
 - API 单选/多选/判断/填空；
 - 缓存命中、图片缓存隔离、低置信度、鉴权、空题干、字符串 options、统计；
 - DeepSeek thinking/非思考/旧 reasoner payload；
-- vision 模型判断、图片消息结构、JSON 解析。
+- vision 模型判断、图片消息结构、JSON 解析；
+- WebUI 配置页、配置脱敏、Token/本机保护、`.env` 保存与回读、连接测试、OCS 配置生成。
 
 ### 13.2 建议补充
 
@@ -563,16 +585,17 @@ uv run ocs-llm-answerer --host 127.0.0.1 --port 8787
 
 ## 16. 迭代路线
 
-### v0.2（当前）
+### v0.3（当前）
 
 - uv + pyproject + uv.lock + CLI；
 - DeepSeek V4.1 Flash / V4 Pro 模型名；
 - thinking / reasoning_effort；
 - deepseek-flash 图片输入；
 - 缓存 key 加图片摘要和思考模式；
-- 28 个自动化测试。
+- 内置 WebUI 配置器（/setup）：连接测试、保存 .env、生成 OCS 配置；
+- 36 个自动化测试。
 
-### v0.3（质量）
+### v0.4（质量）
 
 - 评测集：按课程/题型抽样，统计选项命中率、空答率、错误率；
 - 多选自一致性（2~3 次采样投票）或二次确认；
@@ -581,7 +604,7 @@ uv run ocs-llm-answerer --host 127.0.0.1 --port 8787
 - provider 假服务集成测试；
 - 图片题 prompt 调优。
 
-### v0.4（产品化）
+### v0.5（产品化）
 
 - 多用户/Token/配额/计费；
 - 管理后台、日志查询、反馈闭环；
@@ -622,7 +645,10 @@ ocs-llm-answerer/
 │   ├── models.py
 │   ├── answer.py
 │   ├── prompts.py
+│   ├── setup.py
 │   ├── storage.py
+│   ├── static/
+│   │   └── setup.html
 │   └── providers/
 │       ├── __init__.py
 │       ├── base.py
@@ -632,14 +658,18 @@ ocs-llm-answerer/
 │   ├── test_api.py
 │   ├── test_validate.py
 │   ├── test_provider.py
-│   └── test_prompts.py
+│   ├── test_prompts.py
+│   └── test_setup.py
 ├── data/                  # 运行时生成 SQLite
 ├── .env.example
 ├── .gitignore
 ├── .python-version
+├── .github/workflows/ci.yml
 ├── ocs-config.json
 ├── pyproject.toml
 ├── uv.lock
+├── LICENSE
+├── CONTRIBUTING.md
 ├── README.md
 └── DEVELOPMENT.md
 ```

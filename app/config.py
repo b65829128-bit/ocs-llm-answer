@@ -51,6 +51,7 @@ class Settings:
     min_confidence: float
     api_token: str
     db_path: Path
+    env_path: Path
     cache_ttl_seconds: int
     cors_origins: str
     log_level: str
@@ -83,6 +84,7 @@ def load_settings() -> Settings:
         min_confidence=_env_float("MIN_CONFIDENCE", 0.35),
         api_token=os.getenv("API_TOKEN", "").strip(),
         db_path=db_path,
+        env_path=ROOT_DIR / ".env",
         cache_ttl_seconds=_env_int("CACHE_TTL_SECONDS", 7 * 24 * 3600),
         cors_origins=os.getenv("CORS_ORIGINS", "*").strip() or "*",
         log_level=os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO",
